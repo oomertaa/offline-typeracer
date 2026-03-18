@@ -50,16 +50,7 @@ void showMessage(std::string message){
    system("cls");
    Sleep(250);
    std::cout << message << std::flush;
-   Sleep(250);
-   system("cls");
-   Sleep(250);
-   std::cout << message << std::flush;
-   Sleep(250);
-   system("cls");
-   Sleep(250);
-   std::cout << message << std::flush;
    Sleep(3000);
-   system("cls");
 }
 
 std::string wordGen(){
@@ -94,7 +85,7 @@ std::string wordGen(){
 
 std::string sentenceGen(){
    std::string sentence = "";
-   for(int i = 0; i < 20; i++){
+   for(int i = 0; i < 5; i++){
       std::string word = wordGen();
       sentence +=  (word + " ");
    }
@@ -113,7 +104,7 @@ void newGame(){
    int wordCursor = 0, cursor = 0;
    auto start = sc::steady_clock::now();
    
-   while(userInput.size() != sentence.size()-1){
+   do{
 
       auto now = sc::steady_clock::now();
       auto diff = sc::duration_cast<sc::seconds>(now - start).count();
@@ -136,9 +127,11 @@ void newGame(){
       if (_kbhit()){
          char lastChar= _getch();
          if (lastChar == 17)
+         {
             system("cls");
             break;
-         if (lastChar == 8 && userInput.size() != 0){
+         }
+            if (lastChar == 8 && userInput.size() != 0){
             userInput.pop_back();
             cursor--;
          }
@@ -150,7 +143,23 @@ void newGame(){
          cursor++;
          }
       }
-   }
+      if(userInput.size() == sentence.size()-1){
+         system("cls");
+         std::cout<<"Congrats, you did it";
+         std::cout << "\n\nTime elapsed:" << timeStr << "; words/min: " << wpm  << std::endl;
+         std::cout << "Press any key to continue";
+         start = sc::steady_clock::now();
+         while(true){
+            if(kbhit())
+               break;
+            now = sc::steady_clock::now();
+            diff = sc::duration_cast<sc::seconds>(now - start).count();
+            if (diff > 5)
+               break;
+         }
+         system("cls");
+      }
+   }while(userInput.size() != sentence.size()-1);
 
 }
 
