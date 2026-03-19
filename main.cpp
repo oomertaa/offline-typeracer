@@ -7,7 +7,8 @@
 #include <random>
 #include <windows.h>
 #include <iomanip>
-
+#include <sstream>
+#include <unordered_set>
 
 #define GREEN   "\033[32m"
 #define RED     "\033[31m"
@@ -22,11 +23,19 @@ namespace sc =  std::chrono;
 void drawSentence(const std::string& sentence, const std::string& userInput, std::string time, int wpm){
     std::cout << "\033[H"; 
     
-    std::cout << "--- TYPE THE TEXT BELOW ---" << "\n\n";
-
+    std::cout << "--- TYPE THE TEXT BELOW ---" << "\n\n ";
+    int wc = 0;
+    
     for (int i = 0; i < sentence.length(); i++) {
-        if (i < userInput.length()) {
-            // Check if the character typed matches the sentence
+         if (sentence[i] == ' ')
+                wc++;
+            if(wc == 8){
+                  std::cout << "\n";
+                  wc = 0;  
+            }
+         if (i < userInput.length()) {
+            
+         // Check if the character typed matches the sentence   
             if (userInput[i] == sentence[i]) {
                 std::cout << GREEN << sentence[i] << RESET;
             } else {
@@ -40,7 +49,7 @@ void drawSentence(const std::string& sentence, const std::string& userInput, std
     }
     
     std::cout << "\n\n Time elapsed:" << time << "; words/min: " << wpm;
-    std::cout << "\nCtrl+Q to quit. it will not affect your stats.";
+    std::cout << "\n Ctrl+Q to quit. it will not affect your stats.";
 }
 
 void showMessage(std::string message){
@@ -59,13 +68,11 @@ std::string wordGen(){
    if (fileSize <= 0) return "";
 
    std::random_device rd;
-
    std::mt19937 gen(rd());
-
    std::uniform_int_distribution<long> dis(0, fileSize - 1);
    
    long randomPos = dis(gen);
-   
+
    //walkback
    char ch;
    while(randomPos > 0){
@@ -90,26 +97,32 @@ std::string wordGen(){
 
 std::string sentenceGen(){
    std::string sentence = "";
-   for(int i = 0; i < 20; i++){
+   for(int i = 0; i < 10; i++){
       std::string word = wordGen();
       sentence +=  (word + " ");
    }
    return sentence;
 }
 
-void newGame(){
-   std::cout<< "\033[?25l";
+void newGame(bool instantDeath = false){
+   if(instantDeath)
+      std::cout << "Good luck. Instant death mode... One mistake and that's it!\n";
    std::cout << "Insert player name:";
    std::string playerName;
    std::cin >> playerName;
+
    std::string sentence = sentenceGen();
    std::string userInput = "";
+   system("cls");
 
+   std::cout<< "\033[?25l";
    drawSentence(sentence, userInput, "00:00", 0);
 
    int wordCursor = 0, cursor = 0;
    auto start = sc::steady_clock::now();
-   
+
+   std::unordered_set<int> mistakes;
+
    do{
 
       auto now = sc::steady_clock::now();
@@ -137,16 +150,43 @@ void newGame(){
             system("cls");
             break;
          }
-            if (lastChar == 8 && userInput.size() != 0){
+         if (lastChar == 8 && userInput.size() != 0){
             userInput.pop_back();
             cursor--;
+            if(mistakes.find(cursor) != mistakes.end())
+               mistakes.erase(cursor);
          }
          else{
-         userInput += lastChar;
-         if (lastChar == ' '){
-            wordCursor++;
-         }
-         cursor++;
+            if(instantDeath && lastChar != sentence[cursor]){
+               system("cls");
+               std::cout<<"Game over! You made a mistake.";
+               std::cout << "\n\nTime elapsed:" << timeStr << "; words/min: " << wpm  << std::endl;
+               std::cout << "Press any key to continue";
+               start = sc::steady_clock::now();
+               Sleep(1500);
+               while(true){
+                  if(kbhit()){
+                     _getch();
+                     break;
+                  }
+                  now = sc::steady_clock::now();
+                  diff = sc::duration_cast<sc::seconds>(now - start).count();
+                  if (diff > 5){
+                     break;
+                  }
+               }
+               system("cls");
+               return;
+            }
+
+            else if(lastChar != sentence[cursor] && instantDeath == false){
+               mistakes.insert(cursor);
+            }
+            userInput += lastChar;
+            if (lastChar == ' ' && sentence[cursor] == ' ' && mistakes.empty()){
+               wordCursor++;
+            }
+            cursor++;
          }
       }
       if(userInput.size() == sentence.size()-1){
@@ -154,22 +194,23 @@ void newGame(){
          std::cout<<"Congrats, you did it";
          std::cout << "\n\nTime elapsed:" << timeStr << "; words/min: " << wpm  << std::endl;
          std::cout << "Press any key to continue";
+         Sleep(500);
          start = sc::steady_clock::now();
          while(true){
-            if(kbhit())
+            if(kbhit()){
+               _getch();
                break;
+            }
             now = sc::steady_clock::now();
             diff = sc::duration_cast<sc::seconds>(now - start).count();
-            if (diff > 5)
-               break;
+            if (diff > 5){
+               system("cls");
+               return;
+            }
          }
          system("cls");
       }
    }while(userInput.size() != sentence.size()-1);
-
-}
-
-void newIDGame(){
 
 }
 
@@ -200,7 +241,7 @@ int main(){
                newGame();
                break;
             case '2':
-               newIDGame();
+               newGame(true);
                break;
             case '3':
                showStats();
