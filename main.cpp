@@ -23,11 +23,11 @@ namespace sc =  std::chrono;
 void drawSentence(const std::string& sentence, const std::string& userInput, std::string time, int wpm){
     std::cout << "\033[H"; 
     
-    std::cout << "--- TYPE THE TEXT BELOW ---" << "\n\n ";
+    std::cout << "--- TYPE THE TEXT BELOW ---" << "\n\n";
     int wc = 0;
     
     for (int i = 0; i < sentence.length(); i++) {
-         if (sentence[i] == ' ')
+         if (i > 0 && sentence[i-1] == ' ')
                 wc++;
             if(wc == 8){
                   std::cout << "\n";
@@ -48,8 +48,8 @@ void drawSentence(const std::string& sentence, const std::string& userInput, std
          }
     }
     
-    std::cout << "\n\n Time elapsed:" << time << "; words/min: " << wpm;
-    std::cout << "\n Ctrl+Q to quit. it will not affect your stats.";
+    std::cout << "\n\n Time elapsed:" << time << "; words/min: " << wpm << "        ";
+    std::cout << "\n Ctrl+Q to quit. it will not affect your stats.     ";
 }
 
 void showMessage(std::string message){
@@ -67,8 +67,10 @@ std::string wordGen(){
    long fileSize = file.tellg();
    if (fileSize <= 0) return "";
 
-   std::random_device rd;
-   std::mt19937 gen(rd());
+   static std::random_device rd;
+   static std::mt19937 gen(static_cast<unsigned int>(
+    std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+   
    std::uniform_int_distribution<long> dis(0, fileSize - 1);
    
    long randomPos = dis(gen);
@@ -97,7 +99,7 @@ std::string wordGen(){
 
 std::string sentenceGen(){
    std::string sentence = "";
-   for(int i = 0; i < 10; i++){
+   for(int i = 0; i < 20; i++){
       std::string word = wordGen();
       sentence +=  (word + " ");
    }
@@ -107,111 +109,85 @@ std::string sentenceGen(){
 void newGame(bool instantDeath = false){
    if(instantDeath)
       std::cout << "Good luck. Instant death mode... One mistake and that's it!\n";
+      
    std::cout << "Insert player name:";
    std::string playerName;
    std::cin >> playerName;
 
    std::string sentence = sentenceGen();
+   if (!sentence.empty()) sentence.pop_back();
+
    std::string userInput = "";
    system("cls");
-
    std::cout<< "\033[?25l";
-   drawSentence(sentence, userInput, "00:00", 0);
-
-   int wordCursor = 0, cursor = 0;
-   auto start = sc::steady_clock::now();
-
+   
+   int cursor = 0;
    std::unordered_set<int> mistakes;
+
+   drawSentence(sentence, userInput, "00:00", 0);
+   while(!_kbhit());
+   auto start = sc::steady_clock::now();
 
    do{
 
       auto now = sc::steady_clock::now();
-      auto diff = sc::duration_cast<sc::seconds>(now - start).count();
+      auto diff_ms = sc::duration_cast<sc::milliseconds>(now - start).count();
 
-      int min = diff / 60;
-      int sec = diff % 60;
-
+      int total_seconds = diff_ms / 1000;
+      int min = total_seconds / 60;
+      int sec = total_seconds % 60;
       std::stringstream ss;
       ss << std::setfill('0') << std::setw(2) << min << ":" << std::setfill('0') << std::setw(2) << sec;
       std::string timeStr = ss.str();
       
-      long wpm, rt;
-      rt = min*60 + sec;
-      if(rt != 0)
-         wpm = (long)(wordCursor/(rt/60.0));
-      else
-         wpm = 0;
+      int wpm = 0;
+      if(diff_ms > 1000){
+         double minutes = static_cast<double>(diff_ms) / 60000.0;
+         double words = static_cast<double>(userInput.size()) / 5.0; 
+         wpm = static_cast<long int>(words / minutes);
+      }
+
       drawSentence(sentence, userInput, timeStr, wpm);
 
       if (_kbhit()){
          char lastChar= _getch();
-         if (lastChar == 17)
-         {
+         if (lastChar == 17) {
             system("cls");
             break;
          }
-         if (lastChar == 8 && userInput.size() != 0){
+         if (lastChar == 8 && userInput.size() != 0) {
             userInput.pop_back();
             cursor--;
-            if(mistakes.find(cursor) != mistakes.end())
-               mistakes.erase(cursor);
+            mistakes.erase(cursor);
          }
          else{
-            if(instantDeath && lastChar != sentence[cursor]){
-               system("cls");
-               std::cout<<"Game over! You made a mistake.";
-               std::cout << "\n\nTime elapsed:" << timeStr << "; words/min: " << wpm  << std::endl;
-               std::cout << "Press any key to continue";
-               start = sc::steady_clock::now();
-               Sleep(1500);
-               while(true){
-                  if(kbhit()){
-                     _getch();
-                     break;
-                  }
-                  now = sc::steady_clock::now();
-                  diff = sc::duration_cast<sc::seconds>(now - start).count();
-                  if (diff > 5){
-                     break;
-                  }
+            if(lastChar != sentence[cursor]){
+               if(instantDeath){
+                  system("cls");
+                  std::cout << "Game over! You made a mistake.\n";
+                  std::cout << "WPM: " << wpm << " | Time: " << timeStr << "\n";
+                  Sleep(2000);
+                  return;
                }
-               system("cls");
-               return;
-            }
-
-            else if(lastChar != sentence[cursor] && instantDeath == false){
                mistakes.insert(cursor);
             }
             userInput += lastChar;
-            if (lastChar == ' ' && sentence[cursor] == ' ' && mistakes.empty()){
-               wordCursor++;
-            }
             cursor++;
          }
       }
-      if(userInput.size() == sentence.size()-1){
-         system("cls");
-         std::cout<<"Congrats, you did it";
-         std::cout << "\n\nTime elapsed:" << timeStr << "; words/min: " << wpm  << std::endl;
-         std::cout << "Press any key to continue";
-         Sleep(500);
-         start = sc::steady_clock::now();
-         while(true){
-            if(kbhit()){
-               _getch();
-               break;
-            }
-            now = sc::steady_clock::now();
-            diff = sc::duration_cast<sc::seconds>(now - start).count();
-            if (diff > 5){
-               system("cls");
-               return;
-            }
-         }
-         system("cls");
-      }
-   }while(userInput.size() != sentence.size()-1);
 
+      Sleep(10);
+
+   }while(userInput.size() != sentence.size());
+   
+   system("cls");
+   std::cout << "Congrats, you did it!\n";
+   auto final_now = sc::steady_clock::now();
+   double final_ms = sc::duration_cast<sc::milliseconds>(final_now - start).count();
+   int final_wpm = static_cast<int>((userInput.size() / 5.0) / (final_ms / 60000.0));
+   std::cout << "Final WPM: " << final_wpm << "\nPress any key to return to menu.";
+   _getch();
+   system("cls");
 }
 
 void showStats(){
